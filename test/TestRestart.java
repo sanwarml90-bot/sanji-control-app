@@ -104,6 +104,28 @@ public class TestRestart {
                     main.contains("ControlService.start(this, 0, null)"));
             check("capture status tells the user to re-grant for screen",
                     main.contains("tap Start now for screen"));
+            // ---- v9 full-permission setup flow ----
+            check("v9: MainActivity has the full-permission flow",
+                    main.contains("startFullSetup()")
+                            && main.contains("advanceFullSetup()")
+                            && main.contains("fullSetupRunning"));
+            check("v9: full-permission flow covers notification, accessibility, capture, device admin, battery",
+                    main.contains("isNotificationMissing()")
+                            && main.contains("ControlAccessibilityService.isEnabled()")
+                            && main.contains("captureGrantedThisSession")
+                            && main.contains("isDeviceAdminActive()")
+                            && main.contains("isBatteryExempt()"));
+            check("v9: GRANT ALL PERMISSIONS button is wired",
+                    main.contains("R.id.fullSetupButton")
+                            && main.contains("startFullSetup"));
+            check("v9: full-permission flow auto-offers once per install",
+                    main.contains("Prefs.wasFullSetupOffered(this)")
+                            && main.contains("Prefs.setFullSetupOffered(this, true)"));
+            check("v9: notification result continues the full-permission flow",
+                    main.contains("if (fullSetupRunning)"));
+            check("v9: Prefs tracks full-setup offered",
+                    readSource("Prefs.java") != null
+                            && readSource("Prefs.java").contains("KEY_FULL_SETUP_OFFERED"));
         }
         if (manifest != null) {
             check("manifest declares RestartReceiver",
