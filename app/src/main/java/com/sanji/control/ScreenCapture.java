@@ -55,6 +55,19 @@ public class ScreenCapture {
         this.projectionManager =
                 (MediaProjectionManager) context.getSystemService(Context.MEDIA_PROJECTION_SERVICE);
         this.projection = projectionManager.getMediaProjection(resultCode, data);
+        // v7: EAGER VirtualDisplay setup. The display used to be created
+        // lazily on the first screenshot — which failed when the app was
+        // fully in the background (fullscreen browser, no split-screen),
+        // because createVirtualDisplay does not work reliably from the
+        // background. In split-screen the app is visible, so the first
+        // screenshot worked and later ones reused the display. Creating it
+        // NOW (app is in the foreground, user just tapped "Start now")
+        // makes background screenshots reuse the ready display. A failure
+        // here is non-fatal: captureOnce() still retries lazily.
+        try {
+            ensureSetup();
+        } catch (Exception ignored) {
+        }
     }
 
     /** True when MediaProjection was granted and a projection exists. */
@@ -148,15 +161,38 @@ public class ScreenCapture {
             width = MAX_WIDTH;
             height = (int) Math.round(height * scale);
         }
-        captureThread = new HandlerThread("sanji-capture");
-        captureThread.start();
-        captureHandler = new Handler(captureThread.getLooper());
-        imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2);
-        virtualDisplay = projection.createVirtualDisplay(
-                "sanji-control",
-                width, height, density,
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                imageReader.getSurface(), null, captureHandler);
+        // v7: build into LOCALS first. The old code assigned the thread
+        // and ImageReader to fields BEFORE createVirtualDisplay ran — so a
+        // failure there leaked a started thread + an open ImageReader on
+        // every retry, and the next attempt piled on more. Now a failure
+        // cleans up and leaves the fields untouched, so the next
+        // ensureSetup() retries from a clean state.
+        HandlerThread thread = new HandlerThread("sanji-capture");
+        thread.start();
+        Handler handler = new Handler(thread.getLooper());
+        ImageReader reader = null;
+        VirtualDisplay display = null;
+        try {
+            reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2);
+            display = projection.createVirtualDisplay(
+                    "sanji-control",
+                    width, height, density,
+                    DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                    reader.getSurface(), null, handler);
+        } catch (Exception e) {
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (Exception ignored) {
+                }
+            }
+            thread.quitSafely();
+            return;
+        }
+        captureThread = thread;
+        captureHandler = handler;
+        imageReader = reader;
+        virtualDisplay = display;
     }
 
     private String imageToJpegBase64(Image image) {
