@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Device admin policies for Sanji Control.
+     ONLY force-lock (remote lock). No wipe, no password reset,
+     no other policies — deliberately minimal. -->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+        <force-lock />
+    </uses-policies>
+</device-admin>
