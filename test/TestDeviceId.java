@@ -117,8 +117,8 @@ public class TestDeviceId {
         if (main != null) {
             check("MainActivity persists wasOn=true on ON",
                     main.contains("Prefs.setWasOn(this, true)"));
-            check("MainActivity persists wasOn=false on OFF",
-                    main.contains("Prefs.setWasOn(this, false)"));
+            check("v8 always-on: MainActivity never persists wasOn=false (no OFF)",
+                    !main.contains("Prefs.setWasOn(this, false)"));
             check("MainActivity shows the UID",
                     main.contains("DeviceId.getUid(this)")
                             && main.contains("uidText"));
