@@ -63,11 +63,13 @@ public class TestGrantManager {
         check("second start with grant while running -> install (not ignored)",
                 !d.firstStart && d.installCapture);
 
-        // 4. Capture installed -> further grants do not reinstall.
+        // 4. v11: a valid grant ALWAYS reinstalls, even when a capture is
+        // already installed — the old capture may be broken (no frames) and
+        // a re-grant must replace it, not be dropped.
         g2.noteCaptureInstalled(true);
         d = g2.onStart(true);
-        check("grant while capture already installed -> no reinstall",
-                !d.installCapture);
+        check("grant while capture installed -> reinstall (replace broken capture)",
+                d.installCapture);
         check("manager reports capture installed", g2.hasCapture());
 
         // 5. Restart without a grant -> nothing to do.
