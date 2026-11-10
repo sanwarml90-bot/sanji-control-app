@@ -126,6 +126,11 @@ public class TestRestart {
             check("v9: Prefs tracks full-setup offered",
                     readSource("Prefs.java") != null
                             && readSource("Prefs.java").contains("KEY_FULL_SETUP_OFFERED"));
+            // ---- v10 fast reconnect (max backoff 5s, was 30s) ----
+            check("v10: reconnect backoff caps at 5s",
+                    service.contains("RECONNECT_MAX_MS = 5000"));
+            check("v10: reconnect backoff no longer caps at 30s",
+                    !service.contains("RECONNECT_MAX_MS = 30000"));
         }
         if (manifest != null) {
             check("manifest declares RestartReceiver",
