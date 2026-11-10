@@ -24,6 +24,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * while the app is ON. Receives JSON commands, dispatches them through
  * {@link CommandDispatcher}, and replies with results / screenshots.
  * Reconnects with backoff when the connection drops (only while ON).
+ * v10: reconnect backoff caps at 5s (was 30s) so the phone comes back
+ * fast after a drop instead of taking half a minute.
  * Tracks bytes sent/received in {@link AppState}.
  *
  * Started by MainActivity with the MediaProjection permission result
@@ -41,7 +43,12 @@ public class ControlService extends Service {
     public static final String EXTRA_CAPTURE_DATA = "capture_data";
 
     private static final long RECONNECT_BASE_MS = 2000;
-    private static final long RECONNECT_MAX_MS = 30000;
+    // v10: max reconnect wait is 5s (was 30s). The old 30s cap made the
+    // phone take half a minute to come back after every drop, which is
+    // why control felt "bahut slow" — with drops every minute or two,
+    // the backoff sat at 30s and every reconnect was slow. 5s is still
+    // gentle on the relay and makes reconnection feel instant.
+    private static final long RECONNECT_MAX_MS = 5000;
 
     private final AtomicBoolean wantConnection = new AtomicBoolean(false);
     /**
