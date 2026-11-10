@@ -9,6 +9,7 @@
     <string name="status_on">Status: ON — remote control active</string>
     <string name="data_used_none">Data used this session: 0 B</string>
     <string name="setup_title">Setup checklist</string>
+    <string name="grant_all_permissions">GRANT ALL PERMISSIONS</string>
     <string name="accessibility_off">Accessibility Service: OFF — taps and typing will not work.</string>
     <string name="accessibility_on">Accessibility Service: ON</string>
     <string name="enable_accessibility">Enable Accessibility Service</string>
