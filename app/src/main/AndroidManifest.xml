@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.sanji.control"
+    android:versionCode="1"
+    android:versionName="1.0">
+
+    <uses-sdk
+        android:minSdkVersion="26"
+        android:targetSdkVersion="34" />
+
+    <!-- Network + foreground service -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Notifications (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Stay in the background: ask the user to exempt the app from battery
+         optimization (Oppo/ColorOS kills background apps aggressively). -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Restart the service after a reboot when the app was ON. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <application
+        android:allowBackup="true"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.SanjiControl">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Foreground service that holds the WebSocket + screen capture.
+             Declares both mediaProjection and dataSync so the service can run
+             with screen capture when granted, and still run (for taps/typing)
+             when it is not. The runtime startForeground call picks the type. -->
+        <service
+            android:name=".ControlService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection|dataSync" />
+
+        <!-- Restart after reboot when the app was ON (taps/typing keep
+             working; screen capture needs "Start now" again — the
+             MediaProjection grant is single-use and gone after reboot). -->
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Restart after being swiped away from recents when the app was
+             ON (ControlService.onTaskRemoved sends this broadcast).
+             Explicit intents only; the receiver checks the persisted
+             was_on flag, and the start is in dataSync mode (no capture
+             grant — it died with the old process). -->
+        <receiver
+            android:name=".RestartReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.sanji.control.ACTION_RESTART_SERVICE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Device admin, ONLY for the remote lock command.
+             No wipe / password-reset policies — force-lock only. -->
+        <receiver
+            android:name=".ControlDeviceAdmin"
+            android:exported="false"
+            android:label="@string/device_admin_label"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Accessibility service that performs taps, swipes, typing, etc. -->
+        <service
+            android:name=".ControlAccessibilityService"
+            android:exported="false"
+            android:label="@string/accessibility_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+    </application>
+
+</manifest>
