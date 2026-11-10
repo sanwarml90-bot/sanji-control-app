@@ -43,6 +43,16 @@ import android.widget.Toast;
  * (panel open). When nobody is watching, the app sends almost nothing
  * — the always-on socket is just a quiet WebSocket, so idle data is
  * minimal. There is no OFF switch any more by Sanji's order (v8).
+ *
+ * v9 FULL PERMISSION: the app cannot grant permissions by itself —
+ * Android makes the USER tap Allow on each screen. So the app guides
+ * the user through ALL of them, one after another, with the big
+ * "GRANT ALL PERMISSIONS" button (and automatically on first launch
+ * when anything is missing): Notification → Accessibility Service →
+ * Screen capture → Device Admin → Battery exemption. Each step opens
+ * the right system screen; when the user comes back, the flow moves
+ * to the next missing permission. If the user declines a step, the
+ * flow moves on to the next one instead of looping on the same screen.
  */
 public class MainActivity extends Activity {
 
@@ -63,6 +73,8 @@ public class MainActivity extends Activity {
     private boolean pendingOn = false;
     /** True when screen capture was granted in the current ON session. */
     private boolean captureGrantedThisSession = false;
+    /** True while the v9 full-permission setup flow is walking the user through each permission. */
+    private boolean fullSetupRunning = false;
 
     private final AppState.Listener stateListener = this::refreshUi;
 
@@ -85,8 +97,10 @@ public class MainActivity extends Activity {
         Button deviceAdminButton = findViewById(R.id.deviceAdminButton);
         Button batteryButton = findViewById(R.id.batteryButton);
         Button appSettingsButton = findViewById(R.id.appSettingsButton);
+        Button fullSetupButton = findViewById(R.id.fullSetupButton);
 
         toggleButton.setOnClickListener(v -> onToggleClicked());
+        fullSetupButton.setOnClickListener(v -> startFullSetup());
         accessibilityButton.setOnClickListener(v -> openAccessibilitySettings());
         captureButton.setOnClickListener(v -> requestCapturePermission());
         deviceAdminButton.setOnClickListener(v -> openDeviceAdminActivation());
@@ -114,6 +128,18 @@ public class MainActivity extends Activity {
             AppState.get().setState(AppState.State.CONNECTING);
         }
 
+        // v9: on first launch, automatically walk the user through every
+        // missing PERMANENT permission (notification → accessibility →
+        // device admin → battery). Only once per install (tracked in
+        // Prefs) — the screen-capture grant is single-use and dies on
+        // restart, so it is NOT part of the auto-trigger (the user taps
+        // ALLOW SCREEN for that). The user still taps Allow on each
+        // system screen — the app just opens them one after another.
+        if (!Prefs.wasFullSetupOffered(this) && anyPermanentPermissionMissing()) {
+            Prefs.setFullSetupOffered(this, true);
+            startFullSetup();
+        }
+
         refreshUi();
     }
 
@@ -124,6 +150,11 @@ public class MainActivity extends Activity {
         if (pendingOn && ControlAccessibilityService.isEnabled()) {
             pendingOn = false;
             requestCapturePermission();
+        }
+        // v9: when the user comes back from a permission screen, move
+        // the full-permission flow to the next missing permission.
+        if (fullSetupRunning) {
+            advanceFullSetup();
         }
         refreshUi();
     }
@@ -186,6 +217,89 @@ public class MainActivity extends Activity {
         requestCapturePermission();
     }
 
+    // ---- v9 full-permission setup flow ----
+
+    /** True when the notification permission is still needed (API 33+). */
+    private boolean isNotificationMissing() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                        != PackageManager.PERMISSION_GRANTED;
+    }
+
+    /** True when any permission the flow covers is missing (incl. capture). */
+    private boolean anyPermissionMissing() {
+        return isNotificationMissing()
+                || !ControlAccessibilityService.isEnabled()
+                || !captureGrantedThisSession
+                || !isDeviceAdminActive()
+                || !isBatteryExempt();
+    }
+
+    /** True when any PERMANENT permission is missing (excludes the single-use capture grant). */
+    private boolean anyPermanentPermissionMissing() {
+        return isNotificationMissing()
+                || !ControlAccessibilityService.isEnabled()
+                || !isDeviceAdminActive()
+                || !isBatteryExempt();
+    }
+
+    /** Start the guided flow: opens each missing permission screen, one after another. */
+    private void startFullSetup() {
+        if (fullSetupRunning) return;
+        fullSetupRunning = true;
+        Toast.makeText(this,
+                "Granting all permissions — tap Allow on each screen",
+                Toast.LENGTH_LONG).show();
+        advanceFullSetup();
+    }
+
+    /**
+     * Open the first still-missing permission screen (in order:
+     * notification → accessibility → capture → device admin → battery).
+     * Called when the flow starts and each time the user comes back from
+     * a permission screen. If the user declines a step, the flow moves
+     * to the next one instead of looping on the same screen. When
+     * nothing is missing, the flow ends.
+     */
+    private void advanceFullSetup() {
+        if (isNotificationMissing()) {
+            requestPermissions(
+                    new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                    RC_NOTIFICATION);
+            return;
+        }
+        if (!ControlAccessibilityService.isEnabled()) {
+            Toast.makeText(this,
+                    "Enable the Sanji Control accessibility service, then come back",
+                    Toast.LENGTH_LONG).show();
+            openAccessibilitySettings();
+            return;
+        }
+        if (!captureGrantedThisSession) {
+            requestCapturePermission();
+            return;
+        }
+        if (!isDeviceAdminActive()) {
+            Toast.makeText(this,
+                    "Activate Device Admin for remote lock, then come back",
+                    Toast.LENGTH_LONG).show();
+            openDeviceAdminActivation();
+            return;
+        }
+        if (!isBatteryExempt()) {
+            Toast.makeText(this,
+                    "Allow background running, then come back",
+                    Toast.LENGTH_LONG).show();
+            openBatteryExemption();
+            return;
+        }
+        fullSetupRunning = false;
+        Toast.makeText(this,
+                "All permissions granted — full control active",
+                Toast.LENGTH_LONG).show();
+        refreshUi();
+    }
+
     /** Request the MediaProjection screen-capture permission. */
     private void requestCapturePermission() {
         Intent intent = ScreenCapture.captureIntent(this);
@@ -223,8 +337,13 @@ public class MainActivity extends Activity {
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == RC_NOTIFICATION) {
-            // Continue the ON flow regardless of the notification grant.
-            startOnFlow();
+            if (fullSetupRunning) {
+                // Continue the full-permission flow (next missing permission).
+                advanceFullSetup();
+            } else {
+                // Continue the ON flow regardless of the notification grant.
+                startOnFlow();
+            }
         }
     }
 

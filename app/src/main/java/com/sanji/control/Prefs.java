@@ -23,6 +23,7 @@ public final class Prefs {
     public static final String FILE = "sanji_control";
     public static final String KEY_WAS_ON = "was_on";
     public static final String KEY_FALLBACK_UID = "fallback_uid";
+    public static final String KEY_FULL_SETUP_OFFERED = "full_setup_offered";
 
     private Prefs() {}
 
@@ -71,6 +72,15 @@ public final class Prefs {
         store.putString(KEY_FALLBACK_UID, value);
     }
 
+    /** True once the v9 full-permission setup flow has been auto-offered (once per install). */
+    public static boolean wasFullSetupOffered(Store store) {
+        return store.getBoolean(KEY_FULL_SETUP_OFFERED, false);
+    }
+
+    public static void setFullSetupOffered(Store store, boolean value) {
+        store.putBoolean(KEY_FULL_SETUP_OFFERED, value);
+    }
+
     // ---- Context conveniences ----
 
     public static boolean wasOn(Context context) {
@@ -79,5 +89,13 @@ public final class Prefs {
 
     public static void setWasOn(Context context, boolean value) {
         setWasOn(androidStore(context), value);
+    }
+
+    public static boolean wasFullSetupOffered(Context context) {
+        return wasFullSetupOffered(androidStore(context));
+    }
+
+    public static void setFullSetupOffered(Context context, boolean value) {
+        setFullSetupOffered(androidStore(context), value);
     }
 }
