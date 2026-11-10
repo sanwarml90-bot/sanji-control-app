@@ -1,0 +1,36 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.sanji.control'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.sanji.control"
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+// No external dependencies: the app is pure Java + Android framework.
+// The WebSocket is a hand-rolled client (WebSocketClient.java) and the UI
+// uses android.app.Activity, so no Kotlin, OkHttp, or AndroidX is needed.
+// This keeps the build working even when dependency downloads are blocked.
+// (The Gradle build still needs the Android Gradle Plugin itself, which
+// must be downloaded once on a machine with working Java networking.)
+dependencies {
+}
