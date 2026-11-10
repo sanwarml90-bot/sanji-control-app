@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Sanji Control</string>
+    <string name="tagline">Remote control for this phone — ON only when you say so.</string>
+    <string name="turn_on">TURN ON</string>
+    <string name="turn_off">TURN OFF</string>
+    <string name="status_off">Status: OFF — using zero mobile data</string>
+    <string name="status_connecting">Status: Connecting…</string>
+    <string name="status_on">Status: ON — remote control active</string>
+    <string name="data_used_none">Data used this session: 0 B</string>
+    <string name="setup_title">Setup checklist</string>
+    <string name="accessibility_off">Accessibility Service: OFF — taps and typing will not work.</string>
+    <string name="accessibility_on">Accessibility Service: ON</string>
+    <string name="enable_accessibility">Enable Accessibility Service</string>
+    <string name="capture_off">Screen capture: not allowed — screenshots will not work.</string>
+    <string name="capture_on">Screen capture: allowed</string>
+    <string name="allow_capture">Allow Screen Capture</string>
+    <string name="device_admin_label">Sanji Control</string>
+    <string name="device_admin_off">Device Admin (for remote lock): OFF — remote lock will not work.</string>
+    <string name="device_admin_on">Device Admin (for remote lock): ON</string>
+    <string name="enable_device_admin">Enable Device Admin</string>
+    <string name="device_admin_explanation">Sanji Control needs device admin ONLY to lock this phone remotely. Nothing else — no wipe, no password changes.</string>
+    <string name="uid_unknown">Phone UID: …</string>
+    <string name="uid_hint">Tap the UID to copy it — enter it in the control panel to pick this phone.</string>
+    <string name="background_title">Stay in the background</string>
+    <string name="battery_not_exempt">Battery optimization: ON — the phone may kill the app in the background.</string>
+    <string name="battery_exempt">Battery optimization: Exempt — the app stays in the background.</string>
+    <string name="allow_background">Allow background running</string>
+    <string name="background_help">On Oppo / ColorOS the phone also kills background apps unless you allow "Auto-start" and "Allow background running" for Sanji Control in the phone Settings → Apps. After a reboot the app restarts by itself only if it was ON — taps and typing keep working, but the screen needs "Start now" again (the screen permission is asked every time, Android rule).</string>
+    <string name="open_app_settings">Open App Settings</string>
+    <string name="data_note">When OFF, the app uses zero mobile data. When ON, the screen is streamed live (~4 frames/sec, JPEG quality 50, max width 540) only while a controller is connected; when no controller is connected, no frames are sent. Screen capture permission is asked every time the app is turned ON (Android privacy rule — device admin does not change this).</string>
+    <string name="accessibility_service_label">Sanji Control</string>
+    <string name="accessibility_description">Lets Sanji Control tap, swipe and type on this phone when remote control is ON.</string>
+    <string name="notification_title">Sanji Control ON</string>
+    <string name="notification_text">Remote control active — tap to open, or turn it OFF.</string>
+    <string name="notification_turn_off">Turn OFF</string>
+</resources>
